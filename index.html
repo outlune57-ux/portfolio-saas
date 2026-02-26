@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@200;300;400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --cream:#f5f0e8;--dark:#14100c;
+  --gold:#c9a96e;--gold-l:#e8d5a3;
+  --pw:min(390px,42vw);--ph:min(560px,68vh);
+}
+@media(max-width:600px){:root{--pw:min(175px,44vw);--ph:min(260px,60vw)}}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Cormorant Garamond',serif;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 88% 68% at 50% 44%,#261706 0%,transparent 70%),
+  radial-gradient(ellipse 55% 55% at 12% 88%,#180d04 0%,transparent 55%);}
+
+/* Loading */
+.loading-screen{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.loading-spinner{width:32px;height:32px;border:1.5px solid rgba(201,169,110,0.2);
+  border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Not found */
+.not-found{text-align:center;padding:40px}
+.nf-label{font-family:'Montserrat',sans-serif;font-weight:200;font-size:.55rem;letter-spacing:.5em;text-transform:uppercase;color:var(--gold);margin-bottom:16px}
+.nf-title{font-weight:300;font-size:clamp(2rem,5vw,3.5rem);color:var(--cream);margin-bottom:12px}
+.nf-sub{font-family:'Montserrat',sans-serif;font-weight:200;font-size:.6rem;letter-spacing:.3em;color:rgba(245,240,232,.3);text-transform:uppercase}
+
+/* Header */
+.be-header{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;border-bottom:1px solid rgba(201,169,110,.1)}
+.be-hdr-inner{display:flex;align-items:center;gap:10px;font-family:'Montserrat',sans-serif;font-weight:200;font-size:clamp(.44rem,.95vw,.6rem);letter-spacing:.48em;text-transform:uppercase}
+.be-hdr-name{font-weight:300;color:var(--gold-l)}
+.be-hdr-sep{color:rgba(201,169,110,.3)}
+.be-hdr-tag{color:rgba(201,169,110,.38)}
+
+/* Stage */
+.be-stage{position:relative;z-index:10;perspective:2400px;perspective-origin:50% 48%}
+.be-book{position:relative;width:calc(var(--pw)*2);height:var(--ph);
+  animation:bookIn 1s cubic-bezier(.16,1,.3,1) both;
+  filter:drop-shadow(0 24px 64px rgba(0,0,0,.85)) drop-shadow(0 2px 6px rgba(0,0,0,.5));}
+@keyframes bookIn{from{opacity:0;transform:translateY(24px) scale(.94)}to{opacity:1;transform:none}}
+
+/* Tap zones — invisible but large hit areas */
+.tap-zone{position:absolute;top:0;bottom:0;width:50%;z-index:500;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;outline:none;border:none;background:transparent;}
+.tap-zone-r{right:0}
+.tap-zone-l{left:0}
+
+/* Spreads */
+.be-spread{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;border-radius:3px;overflow:hidden}
+.be-hidden{display:none!important}
+.be-page{position:absolute;inset:0}
+.be-pg-l{border-radius:3px 0 0 3px}
+.be-pg-r{border-radius:0 3px 3px 0}
+.pg{position:relative;overflow:hidden;background:var(--cream)}
+.pg-l{border-radius:3px 0 0 3px}
+.pg-r{border-radius:0 3px 3px 0}
+.pg::after{content:'';position:absolute;inset:0;z-index:20;pointer-events:none;opacity:.4;mix-blend-mode:multiply;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E")}
+
+/* Spine */
+.be-spine{position:absolute;left:50%;top:0;bottom:0;width:28px;transform:translateX(-50%);z-index:60;pointer-events:none;
+  background:linear-gradient(to right,rgba(0,0,0,.28) 0%,rgba(0,0,0,.10) 35%,rgba(255,255,255,.04) 50%,rgba(0,0,0,.08) 65%,rgba(0,0,0,.22) 100%)}
+
+/* Flip leaf */
+.be-leaf{position:absolute;top:0;height:100%;transform-style:preserve-3d;will-change:transform;pointer-events:none;}
+.be-leaf-fwd{left:50%;width:50%;transform-origin:left center}
+.be-leaf-bwd{left:0;width:50%;transform-origin:right center}
+.be-face{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.be-face-back{transform:rotateY(180deg)}
+
+/* Nav arrows (visible on mobile) */
+.nav-arrows{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);
+  display:flex;gap:24px;z-index:200;align-items:center}
+.nav-btn{width:40px;height:40px;border-radius:50%;border:1px solid rgba(201,169,110,.3);
+  background:rgba(0,0,0,.4);color:var(--gold);font-size:1.1rem;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;transition:all .2s}
+.nav-btn:active{background:rgba(201,169,110,.2);transform:scale(.92)}
+.nav-btn:disabled{opacity:.2;pointer-events:none}
+
+/* Dots */
+.be-dots{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  display:flex;gap:7px;z-index:200;align-items:center}
+.be-dot{width:5px;height:5px;border-radius:50%;background:rgba(201,169,110,.2);cursor:pointer;
+  transition:all .4s cubic-bezier(.34,1.56,.64,1);-webkit-tap-highlight-color:transparent}
+.be-dot-on{background:var(--gold);transform:scale(1.6)}
+
+/* PAGE STYLES */
+.pg-fill{position:absolute;inset:0}
+.cv-dark{background:linear-gradient(148deg,#1c1208 0%,#301e0e 45%,#1a1108 100%)}
+.cv-frame{position:absolute;inset:14px;z-index:2;pointer-events:none;border:1px solid rgba(201,169,110,.26)}
+.cv-frame::before{content:'';position:absolute;inset:6px;border:1px solid rgba(201,169,110,.10)}
+.cv-ctr{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:clamp(18px,4%,36px)}
+.cv-eye{font-family:'Montserrat',sans-serif;font-weight:200;font-size:clamp(.34rem,.75vw,.48rem);letter-spacing:.55em;text-transform:uppercase;color:var(--gold);margin-bottom:16px}
+.cv-h{font-weight:300;font-size:clamp(1.5rem,3.5vw,2.7rem);color:var(--cream);line-height:1.05;letter-spacing:.03em}
+.cv-h em{font-style:italic;color:var(--gold-l);font-size:.72em;display:block;margin-top:4px}
+.cv-rule{display:flex;align-items:center;gap:8px;margin:16px 0}
+.cv-rule s{display:block;width:24px;height:1px;background:var(--gold);text-decoration:none}
+.cv-rule i{display:block;width:4px;height:4px;border-radius:50%;background:var(--gold)}
+.cv-sub{font-family:'Montserrat',sans-serif;font-weight:200;font-size:clamp(.33rem,.7vw,.46rem);letter-spacing:.4em;text-transform:uppercase;color:rgba(245,240,232,.3)}
+.cv-yr{position:absolute;bottom:20px;left:0;right:0;z-index:4;text-align:center;font-family:'Montserrat',sans-serif;font-weight:200;font-size:clamp(.3rem,.62vw,.4rem);letter-spacing:.5em;text-transform:uppercase;color:rgba(201,169,110,.25)}
+.ph-fill{position:absolute;inset:0;background-size:cover;background-position:center}
+.ph-scrim{position:absolute;inset:0;z-index:2;background:linear-gradient(to top,rgba(0,0,0,.68) 0%,rgba(0,0,0,.06) 52%,transparent 100%)}
+.ph-lbl{position:absolute;bottom:0;left:0;right:0;z-index:3;padding:clamp(12px,2.5vw,20px)}
+.lbl-n{font-family:'Montserrat',sans-serif;font-weight:200;font-size:clamp(.33rem,.7vw,.46rem);letter-spacing:.45em;text-transform:uppercase;color:var(--gold-l);margin-bottom:4px}
+.lbl-h{font-size:clamp(.85rem,1.8vw,1.18rem);font-weight:400;color:#fff;line-height:1.2}
+.lbl-h em{font-style:italic;color:var(--gold-l);font-size:.83em}
+.lbl-m{font-family:'Montserrat',sans-serif;font-weight:200;font-size:clamp(.3rem,.63vw,.42rem);letter-spacing:.12em;color:rgba(255,255,255,.5);margin-top:3px}
+.tp{background:var(--cream);position:absolute;inset:0;padding:clamp(16px,3vw,28px);display:flex;flex-direction:column;justify-content:center;gap:11px}
+.tp-n{font-family:'Montserrat',sans-serif;font-weight:200;font-size:clamp(.32rem,.67vw,.44rem);letter-spacing:.45em;text-transform:uppercase;color:var(--gold)}
+.tp-h{font-weight:300;font-size:clamp(1.15rem,2.5vw,1.75rem);color:#1c1410;line-height:1.12}
+.tp-h em{font-style:italic;color:#7a5c14}
+.tp-r{width:24px;height:1px;background:var(--gold)}
+.tp-p{font-size:clamp(.66rem,1.28vw,.82rem);color:#4a3e2c;line-height:1.85}
+.tp-q{font-style:italic;color:#8b6914;font-size:clamp(.68rem,1.35vw,.85rem);line-height:1.65;border-left:1.5px solid var(--gold);padding-left:10px}
+.tp-g{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:3px}
+.tp-gi .gl{font-family:'Montserrat',sans-serif;font-weight:200;font-size:clamp(.29rem,.6vw,.4rem);letter-spacing:.3em;text-transform:uppercase;color:var(--gold);margin-bottom:2px}
+.tp-gi .gv{font-size:clamp(.63rem,1.22vw,.78rem);color:#1c1410}
+.pg-grid{position:absolute;inset:0;display:grid;gap:2px;background:rgba(201,169,110,.15)}
+.pg-grid>div{position:relative;overflow:hidden}
+.bc{background:linear-gradient(148deg,#1c1208 0%,#301e0e 45%,#1a1108 100%);position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px}
+.bc-logo{font-weight:300;font-size:clamp(.9rem,2vw,1.4rem);color:var(--gold-l);letter-spacing:.3em;text-transform:uppercase}
+.bc-logo em{font-style:italic;color:var(--gold);font-size:.6em;display:block;letter-spacing:.16em;margin-top:4px}
+.bc-ln{width:32px;height:1px;background:rgba(201,169,110,.28);margin:14px auto}
+.bc-c{font-family:'Montserrat',sans-serif;font-weight:200;font-size:clamp(.31rem,.63vw,.41rem);letter-spacing:.3em;text-transform:uppercase;color:rgba(245,240,232,.22);line-height:2.3}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const SUPABASE_URL = 'https://reqktwtooeasyyqjordw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlcWt0d3Rvb2Vhc3l5cWpvcmR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNzA1MTAsImV4cCI6MjA4NzY0NjUxMH0.2prXTvfvAZUohq2Z9E33kuyhwExtx0OpqiYLHezEqZ0';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function bootstrap() {
+  const app = document.getElementById('app');
+  const parts = location.pathname.split('/').filter(Boolean);
+  const slug = parts[0] === 'cliente' ? parts[1] : null;
+  if (!slug) {
+    app.innerHTML = `<div class="not-found"><p class="nf-label">Studio Portfolio</p><h1 class="nf-title">Catálogo Digital</h1><p class="nf-sub">Acesse o link enviado pelo fotógrafo</p></div>`;
+    return;
+  }
+  app.innerHTML = `<div class="loading-screen"><div class="loading-spinner"></div></div>`;
+  const {data, error} = await sb.from('portfolios').select('*').eq('slug', slug).single();
+  if (error || !data) {
+    app.innerHTML = `<div class="not-found"><p class="nf-label">Não encontrado</p><h1 class="nf-title">${slug}</h1><p class="nf-sub">Verifique o link com o fotógrafo</p></div>`;
+    return;
+  }
+  app.innerHTML = '';
+  new BookEngine({container: app, portfolio: data});
+}
+
+const PR = {
+  render(p) {
+    if (!p) return '<div style="background:#f5f0e8;position:absolute;inset:0;"></div>';
+    return this[p.type] ? this[p.type](p) : '<div style="background:#f5f0e8;position:absolute;inset:0;"></div>';
+  },
+  cover({title='',subtitle='',eyebrow=''}) {
+    return `<div class="pg-fill cv-dark"></div><div class="cv-frame"></div>
+    <div class="cv-ctr">${eyebrow?`<div class="cv-eye">${eyebrow}</div>`:''}
+    <div class="cv-h">${title}<em>${subtitle}</em></div>
+    <div class="cv-rule"><s></s><i></i><s></s></div>
+    <div class="cv-sub">Photography Portfolio</div></div>
+    <div class="cv-yr">© ${new Date().getFullYear()}</div>`;
+  },
+  photo({image='',label='',title='',subtitle='',meta=''}) {
+    return `<div class="ph-fill" style="background-image:url('${image}');"></div>
+    <div class="ph-scrim"></div>
+    <div class="ph-lbl">${label?`<div class="lbl-n">${label}</div>`:''}
+    ${title?`<div class="lbl-h">${title}${subtitle?`<em> — ${subtitle}</em>`:''}</div>`:''}
+    ${meta?`<div class="lbl-m">${meta}</div>`:''}</div>`;
+  },
+  text({label='',title='',titleItalic='',body='',quote='',grid=[]}) {
+    return `<div class="tp">${label?`<div class="tp-n">${label}</div>`:''}
+    <div class="tp-h">${title}${titleItalic?`<br><em>${titleItalic}</em>`:''}</div>
+    <div class="tp-r"></div>
+    ${body?`<div class="tp-p">${body}</div>`:''}
+    ${quote?`<div class="tp-q">${quote}</div>`:''}
+    ${grid.length?`<div class="tp-g">${grid.map(g=>`<div class="tp-gi"><div class="gl">${g.label}</div><div class="gv">${g.value}</div></div>`).join('')}</div>`:''}</div>`;
+  },
+  grid({label='',images=[]}) {
+    return `<div class="pg-grid" style="grid-template-rows:repeat(${images.length||1},1fr);">
+    ${images.map(s=>`<div><img src="${s}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" loading="lazy"/></div>`).join('')}
+    </div>${label?`<div style="position:absolute;bottom:12px;left:12px;z-index:10;"><div class="lbl-n">${label}</div></div>`:''}`;
+  },
+  quote({quote='',sub=''}) {
+    return `<div class="pg-fill cv-dark"></div><div class="cv-frame"></div>
+    <div style="position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:clamp(20px,5%,44px);text-align:center;">
+    <div style="font-size:clamp(.85rem,1.8vw,1.24rem);font-weight:300;color:rgba(245,240,232,.22);font-style:italic;line-height:1.7;">${quote}</div>
+    <div style="width:26px;height:1px;background:rgba(201,169,110,.22);margin:16px auto;"></div>
+    <div style="font-family:'Montserrat',sans-serif;font-weight:200;font-size:clamp(.3rem,.62vw,.4rem);letter-spacing:.42em;text-transform:uppercase;color:rgba(201,169,110,.22);">${sub}</div></div>`;
+  },
+  backcover() {
+    const p = window._portfolio||{};
+    return `<div class="bc"><div class="cv-frame"></div>
+    <div style="position:relative;z-index:3;text-align:center;">
+    <div class="bc-logo">${p.name||'Studio'}<em>${p.tagline||'Photography'}</em></div>
+    <div class="bc-ln"></div>
+    <div class="bc-c">${p.email?p.email+'<br>':''}${p.phone?p.phone+'<br>':''}${p.instagram?'@'+p.instagram:''}</div>
+    </div></div>`;
+  }
+};
+
+class BookEngine {
+  constructor({container, portfolio}) {
+    this.root = container;
+    this.portfolio = portfolio;
+    window._portfolio = portfolio;
+    this.spreads = portfolio.spreads || [];
+    this.cur = 0;
+    this.anim = false;
+    this._init();
+  }
+
+  _el(tag, cls='') {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    return e;
+  }
+
+  _init() {
+    this.root.innerHTML = '';
+
+    // Header
+    const hdr = this._el('div','be-header');
+    hdr.innerHTML = `<div class="be-hdr-inner">
+      <span class="be-hdr-name">${this.portfolio.name||''}</span>
+      <span class="be-hdr-sep">·</span>
+      <span class="be-hdr-tag">${this.portfolio.tagline||''}</span></div>`;
+    this.root.appendChild(hdr);
+
+    // Stage + book
+    this.stage = this._el('div','be-stage');
+    this.root.appendChild(this.stage);
+    this.book = this._el('div','be-book');
+    this.stage.appendChild(this.book);
+
+    // Spreads
+    this.spreadEls = this.spreads.map((s,i) => {
+      const el = this._el('div','be-spread'+(i>0?' be-hidden':''));
+      el.innerHTML =
+        `<div class="be-page be-pg-l pg pg-l">${PR.render(s.left)}</div>`+
+        `<div class="be-page be-pg-r pg pg-r">${PR.render(s.right)}</div>`;
+      this.book.appendChild(el);
+      return el;
+    });
+
+    // Spine
+    this.book.appendChild(this._el('div','be-spine'));
+
+    // Flip leaf
+    this.leaf = this._el('div','be-leaf be-leaf-fwd');
+    this.leaf.innerHTML = `<div class="be-face be-face-front" id="_ff"></div><div class="be-face be-face-back" id="_fb"></div>`;
+    this.leaf.style.zIndex = '-1';
+    this.book.appendChild(this.leaf);
+    this.ff = document.getElementById('_ff');
+    this.fb = document.getElementById('_fb');
+
+    // TAP ZONES — two invisible buttons covering each half
+    this.tapR = this._el('button','tap-zone tap-zone-r');
+    this.tapL = this._el('button','tap-zone tap-zone-l');
+    this.book.appendChild(this.tapR);
+    this.book.appendChild(this.tapL);
+
+    // Nav arrows
+    const nav = this._el('div','nav-arrows');
+    this.btnPrev = this._el('button','nav-btn');
+    this.btnNext = this._el('button','nav-btn');
+    this.btnPrev.innerHTML = '←';
+    this.btnNext.innerHTML = '→';
+    nav.appendChild(this.btnPrev);
+    nav.appendChild(this.btnNext);
+    this.root.appendChild(nav);
+
+    // Dots
+    this.dotsEl = this._el('div','be-dots');
+    this.root.appendChild(this.dotsEl);
+    this._buildDots();
+    this._updateNav();
+
+    this._bindEvents();
+  }
+
+  _buildDots() {
+    this.dotsEl.innerHTML = '';
+    this.spreads.forEach((_,i) => {
+      const d = this._el('div','be-dot'+(i===this.cur?' be-dot-on':''));
+      d.addEventListener('click', () => this.animTo(i));
+      this.dotsEl.appendChild(d);
+    });
+  }
+
+  _syncDots() {
+    this.dotsEl.querySelectorAll('.be-dot').forEach((d,i) => d.classList.toggle('be-dot-on', i===this.cur));
+    this._updateNav();
+  }
+
+  _updateNav() {
+    this.btnPrev.disabled = this.cur === 0;
+    this.btnNext.disabled = this.cur === this.spreads.length - 1;
+  }
+
+  _prepLeaf(dir, from, to) {
+    this.leaf.className = 'be-leaf ' + (dir==='fwd' ? 'be-leaf-fwd' : 'be-leaf-bwd');
+    const F = this.spreads[from], T = this.spreads[to];
+    if (dir === 'fwd') {
+      this.ff.innerHTML = `<div class="be-page be-pg-r pg pg-r">${PR.render(F?.right)}</div>`;
+      this.fb.innerHTML = T ? `<div class="be-page be-pg-l pg pg-l" style="transform:scaleX(-1);">${PR.render(T.left)}</div>` : '';
+    } else {
+      this.ff.innerHTML = `<div class="be-page be-pg-l pg pg-l">${PR.render(F?.left)}</div>`;
+      this.fb.innerHTML = T ? `<div class="be-page be-pg-r pg pg-r" style="transform:scaleX(-1);">${PR.render(T.right)}</div>` : '';
+    }
+    this.leaf.style.zIndex = '100';
+    this.leaf.style.transform = 'rotateY(0deg)';
+  }
+
+  _snap(from, to, dir, done) {
+    const DUR = 420, start = performance.now();
+    this.anim = true;
+    const tick = now => {
+      const t = Math.min((now - start) / DUR, 1);
+      const e = t < .5 ? 2*t*t : -1+(4-2*t)*t; // ease in-out quad
+      const angle = from + (to - from) * e;
+      this.leaf.style.transform = dir==='fwd' ? `rotateY(${-angle}deg)` : `rotateY(${angle}deg)`;
+      if (t < 1) requestAnimationFrame(tick);
+      else { this.leaf.style.transform = dir==='fwd'?'rotateY(-180deg)':'rotateY(180deg)'; done(); }
+    };
+    requestAnimationFrame(tick);
+  }
+
+  _commit(dir, toIdx) {
+    this.spreadEls[this.cur].classList.add('be-hidden');
+    this.spreadEls[this.cur].style.zIndex = '';
+    this.spreadEls[toIdx].style.zIndex = '';
+    this.cur = toIdx;
+    this.leaf.style.zIndex = '-1';
+    this.leaf.style.transform = 'rotateY(0deg)';
+    this.ff.innerHTML = '';
+    this.fb.innerHTML = '';
+    this.anim = false;
+    this._syncDots();
+  }
+
+  animTo(idx) {
+    if (this.anim || idx === this.cur) return;
+    if (idx < 0 || idx >= this.spreads.length) return;
+    const dir = idx > this.cur ? 'fwd' : 'bwd';
+    this.spreadEls[this.cur].style.zIndex = '2';
+    this.spreadEls[idx].classList.remove('be-hidden');
+    this.spreadEls[idx].style.zIndex = '1';
+    this._prepLeaf(dir, this.cur, idx);
+    const to = idx;
+    this._snap(0, 180, dir, () => this._commit(dir, to));
+  }
+
+  _bindEvents() {
+    // Tap zones
+    this.tapR.addEventListener('click', () => this.animTo(this.cur + 1));
+    this.tapL.addEventListener('click', () => this.animTo(this.cur - 1));
+
+    // Nav buttons
+    this.btnNext.addEventListener('click', () => this.animTo(this.cur + 1));
+    this.btnPrev.addEventListener('click', () => this.animTo(this.cur - 1));
+
+    // Swipe detection
+    let sx = 0, sy = 0;
+    this.book.addEventListener('touchstart', e => {
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+    }, {passive: true});
+    this.book.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - sx;
+      const dy = e.changedTouches[0].clientY - sy;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
+        if (dx < 0) this.animTo(this.cur + 1);
+        else        this.animTo(this.cur - 1);
+      }
+    }, {passive: true});
+
+    // Keyboard
+    document.addEventListener('keydown', e => {
+      if (e.key==='ArrowRight') this.animTo(this.cur + 1);
+      if (e.key==='ArrowLeft')  this.animTo(this.cur - 1);
+    });
+  }
+}
+
+bootstrap().catch(err => {
+  console.error(err);
+  document.getElementById('app').innerHTML = '<div class="not-found"><p class="nf-label">Erro</p><h1 class="nf-title">Tente novamente</h1></div>';
+});
+</script>
+</body>
+</html>
